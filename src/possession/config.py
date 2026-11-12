@@ -24,7 +24,9 @@ DATA_DIR = Path(os.environ.get("MTAH_DATA_DIR", ROOT / "data"))
 # The official code reads MTAH_DATA_DIR too. Set it so both code bases look in the same place.
 os.environ["MTAH_DATA_DIR"] = str(DATA_DIR)
 
-CACHE_DIR = ROOT / "cache"              # derived arrays (gitignored, never shown to the model)
+# Derived arrays (gitignored, never shown to the model). MTAH_CACHE_DIR moves it, e.g. to
+# prove the submission is rebuilt identically from an empty cache (run.py --check-repro).
+CACHE_DIR = Path(os.environ.get("MTAH_CACHE_DIR", ROOT / "cache"))
 SUBMISSIONS_DIR = ROOT / "submissions"  # our CSVs (gitignored)
 EXTERNAL_DIR = ROOT / "external"        # open data from other games (gitignored)
 
@@ -33,8 +35,8 @@ EXTERNAL_DIR = ROOT / "external"        # open data from other games (gitignored
 METRICA_DIR = EXTERNAL_DIR / "metrica"
 METRICA_COMMIT = "e706dd506b360d69d9d123d5b8026e7294b13996"
 METRICA_GAMES = (1, 2, 3)
-# Degraded external games and their derived labels are cached here (re-built on demand).
-EXTERNAL_CACHE_DIR = EXTERNAL_DIR / "derived"
+# Parsed external games are cached here (re-built on demand); MTAH_EXTERNAL_CACHE_DIR moves it.
+EXTERNAL_CACHE_DIR = Path(os.environ.get("MTAH_EXTERNAL_CACHE_DIR", EXTERNAL_DIR / "derived"))
 
 # The public 5-minute ground truth. For CHECKING the pipeline only, never for tuning.
 PUBLIC_GT = OFFICIAL_DIR / "evaluation" / "gt" / "BAR-ATH_possession_gt_public.csv"

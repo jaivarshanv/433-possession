@@ -149,3 +149,38 @@ published full-match scores. Degraded ×3, pooled:
 - Noise: the 5–95% bootstrap interval on pooled spellF1 is about 0.03 wide (759 possessions),
   a bit narrower than the official full-match band of 0.04. Degradation replicates move the
   score by < 0.002.
+
+## 6. Harness v2 (12 Nov): the ball, as our tracker sees it
+
+Building M3 exposed a gap in the calibration above. A label-free profile of the ball
+kinematics showed that our tracker's ball is **smoothed** and **offset from the players**,
+whereas Metrica's corrected tracking pins the ball to the feet of the player who has it:
+
+| statistic (graded frames, ball seen) | ours | harness v1 (degraded) | harness v2 (degraded) |
+|---|---|---|---|
+| ball acceleration p50 / p90 / p99 (m/s²) | 5.7 / 18.1 / 36.9 | 0.1-1.2 / 18-30 / 134-149 | 5.3-6.1 / ~17 / 28-32 |
+| nearest player to the ball p10 / p50 (m) | 0.44 / 1.91 | 0.04-0.07 / 0.3-1.3 | 0.61-0.72 / 1.85-2.23 |
+| ball seen with a player within 1.5 m | 0.42 | 0.50-0.62 | 0.32-0.40 |
+| touches per minute (`touches.detect`) | 11.1 | 17-24 | 13.6-16.5 |
+
+`degrade.py` step 4b adds a slowly varying random offset (σ 1 m per axis, τ 5 s), then a 1 s
+moving average, then 1 cm jitter, all chosen from a small grid on these aggregates only.
+
+Effect: the harness level now matches the official full-match scores closely, and one M3 idea
+(snapping hand-overs to touches, +0.045 on harness v1) turned out to be an artefact of the
+too-sharp ball:
+
+| baseline | harness v2 spellF1 / macroF1 | harness v1 | official full match |
+|---|---|---|---|
+| raw | 0.049 / 0.714 | 0.054 / 0.740 | 0.0486 / 0.6532 |
+| smooth25 | 0.196 / 0.724 | 0.251 / 0.753 | 0.1996 / 0.6752 |
+| smooth50 | 0.270 / 0.719 | 0.336 / 0.746 | 0.2433 / 0.6724 |
+| smooth125 | 0.296 / 0.672 | 0.328 / 0.692 | 0.2242 / 0.6356 |
+
+The macroF1 order is the official one. smooth50 and smooth125 swap places on spellF1, but their
+gap is inside the noise on both the harness (0.026) and the official board (0.019). All
+predictors were re-scored on harness v2 (docs/EXPERIMENTS.md); harness v1 numbers are history.
+
+Remaining known gaps after v2: our tracker tracks fewer players while the ball is missing
+(19.2 vs 21.4) than the simulation (≈ 20.4 vs 20.8), our player positions are smoother, ball
+height is not simulated, and slot team-assignment errors are not simulated.

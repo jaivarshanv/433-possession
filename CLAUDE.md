@@ -161,6 +161,9 @@ docs/                     PLAN.md, DECISIONS.md, EXPERIMENTS.md, EXTERNAL_VALIDA
 
 ```bash
 uv venv --python 3.11 && source .venv/bin/activate && uv pip install -r requirements.txt
+python run.py                               # THE submission: data/ -> submissions/433.csv
+python run.py --check-repro                 # two rebuilds from empty caches, compare sha256
+python scripts/make_pdf.py                  # docs/TECHNICAL.md -> docs/433.pdf
 pytest -q                                   # synthetic tests, safe anywhere
 python scripts/00_check_data.py             # bundle present? structure, audio track, time base
 python scripts/01_build_cache.py            # parse ATD -> cache/ (once, ~1-2 min)
@@ -201,7 +204,7 @@ registered in `predictors.py`. It runs unchanged on our match via `harness.targe
 | 6 | Sequence decoding: HSMM/Viterbi, boundary snapping, X policy | **done 12 Nov** (M4): weights LOGO-tuned (defaults kept), snapping and X policy measured and dropped (D17, D18) |
 | 7 | Self-training on target match (algorithmic pseudo-labels) | todo |
 | 8 | Stretch: own ball detector (video), whistle audio, broadcast sync | todo |
-| 9 | Reproducibility (`make submission`), technical document | todo |
+| 9 | Reproducibility (`make submission`), technical document | **done 12 Nov** (M7): `python run.py` → `submissions/433.csv`; `--check-repro` two empty-cache rebuilds identical (sha256 `de445d62…`); `docs/TECHNICAL.md` → `docs/433.pdf`; MIT LICENSE |
 
 ## 7. How to report results to the human
 
