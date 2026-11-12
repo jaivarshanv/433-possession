@@ -1,9 +1,17 @@
 """Write a submission CSV and validate it with exactly the official checks."""
 
+import hashlib
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from . import config
+
+
+def sha256_of(path):
+    """Hex sha256 of a file -- how we prove two runs produced the identical submission."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def codes_to_labels(codes):
@@ -19,8 +27,8 @@ def validate_file(path):
     return pm.validate_submission(frame, config.N_FRAMES)
 
 
-def write_submission(labels, name):
-    """Write submissions/<name>.csv from an array of N_FRAMES labels (strings or codes).
+def write_submission(labels, name, path=None):
+    """Write submissions/<name>.csv (or `path`) from an array of N_FRAMES labels (strings or codes).
 
     Validates the written file immediately and raises if it fails, so a broken file can never
     reach the upload form unnoticed. Returns the path.
@@ -31,8 +39,8 @@ def write_submission(labels, name):
     if len(labels) != config.N_FRAMES:
         raise ValueError("need {} labels, got {}".format(config.N_FRAMES, len(labels)))
 
-    config.SUBMISSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    path = config.SUBMISSIONS_DIR / "{}.csv".format(name)
+    path = Path(path) if path else config.SUBMISSIONS_DIR / "{}.csv".format(name)
+    path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame({"frame": np.arange(config.N_FRAMES), "label": labels}).to_csv(path, index=False)
 
     problem = validate_file(path)

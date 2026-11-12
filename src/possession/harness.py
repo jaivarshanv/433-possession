@@ -9,7 +9,9 @@ THE PREDICTOR CONTRACT. A predictor is any function
   track  dict in the format of atd.load_cache(): ball (N,3), px, py (N,S), ps (N,S), team (S,),
          seen (N,). For an external game this is the DEGRADED tracking (degrade.py).
   info   dict of what the organisers also give us for our match:
-           name     game name
+           name     game name, with the degradation replicate ("metrica1#0")
+           game     game name alone ("metrica1", or "BAR-ATH" for our match); a predictor
+                    that learns from external games must leave this one out (training.py)
            pitch    (length_m, width_m)
            fps      25
            half     (N,) int8: 1 or 2 on graded frames, 0 elsewhere
@@ -46,6 +48,7 @@ def external_inputs(number, replicate=0, clean=False):
                       & events["subtype"].str.startswith("KICK OFF")]
     info = {
         "name": "{}#{}".format(game["name"], replicate),
+        "game": game["name"],          # which game: a learned predictor must leave it out
         "replicate": replicate,
         "pitch": game["pitch"],
         "fps": game["fps"],
@@ -61,6 +64,7 @@ def target_inputs():
     from . import atd
     info = {
         "name": config.GAME,
+        "game": config.GAME,           # not an external game: learned parts use all of them
         "pitch": (config.PITCH_LENGTH_M, config.PITCH_WIDTH_M),
         "fps": config.FPS,
         "half": frames.half_of_frame(),

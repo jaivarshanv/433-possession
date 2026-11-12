@@ -11,6 +11,7 @@ External scores run optimistic in level: rank with them, don't forecast with the
 | date | id | change | ext spellF1 [5–95%] | ext macroF1 | public spellF1 (check) | pred poss / mean s | notes |
 |---|---|---|---|---|---|---|---|
 | 2026-10-30 | baseline_smooth50 | official nearest player + ±50 vote, through the stage-2 harness | 0.3355 [0.319–0.351] | 0.7463 | 0.3256 | 1447 / 8.4 s | full-match 0.2433 / 0.6724 (published); on our match predicts 594 poss / 7.2 s |
+| 2026-11-12 | v1_rules | M1: features + dead-ball rule cells + nearest-player-in-2.5 m cells with carry, probabilities counted on external labels (LOGO), HSMM (log-normal durations, 0.2 s blocks, frame refinement), w_dead = w_team = 0.1 | 0.6331 [0.609–0.664] | 0.8743 | 0.3867 | 698 / 15.5 s | alive/dead F1 0.957. Weights LOGO-tuned: 0.629 (13_tune.py). On our match: 249 poss / 14.5 s (median 9.2 s, none < 1 s), 104 stoppages, D 43% of graded frames; public macroF1 0.776 (check). Harness likely flatters gap-based dead ball (corrected-data gaps align with stoppages) |
 
 ## Harness validation: the four official baselines
 

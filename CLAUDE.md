@@ -142,7 +142,12 @@ src/possession/           our package
   degrade.py              external games: clean tracking -> looks like our ATD (seeded)
   profile.py              aggregate tracking statistics (calibrates degrade.py)
   harness.py              predictor contract; score on degraded external games (official metric)
-  predictors.py           registry of named predictors scored by scripts/12
+  predictors.py           registry of named predictors scored by scripts/12; CHOSEN -> 433.csv
+  features.py             per-frame ball / player / direction features (metres, team level)
+  deadball.py             dead-ball rule cells, CellTable, hysteresis segments
+  evidence.py             possession evidence cells, decoder scores, v1 RulesModel
+  decoder.py              HSMM over {H, A, D}: durations, transitions, Viterbi, refinement
+  training.py             leave-one-game-out fitting on external games (LogoPredictor)
 scripts/                  numbered pipeline steps; each prints aggregates only
 tests/                    pytest, synthetic data only (never match data)
 docs/                     PLAN.md, DECISIONS.md, EXPERIMENTS.md, EXTERNAL_VALIDATION.md
@@ -161,6 +166,8 @@ python scripts/10_fetch_external.py         # download Metrica sample games + de
 python scripts/11_profile_tracking.py       # our tracking vs degraded external games (aggregates)
 python scripts/12_evaluate_external.py NAME --replicates 3 --bootstrap 1000 [--public-check]
                                             # score registered predictors: THIS decides
+python scripts/13_tune.py NAME              # weight grid, leave-one-game-out
+python scripts/run.py --predictor NAME [--out submissions/433.csv]   # write + validate
 ```
 
 A new predictor = a function `predict(track, info) -> codes` (contract in `harness.py`),
@@ -184,7 +191,7 @@ registered in `predictors.py`. It runs unchanged on our match via `harness.targe
 |---|---|---|
 | 1 | Data layer: parser, cache, frames, tagging, scoring wrapper | **done, verified 2026-10-30** |
 | 2 | External validation harness (Metrica sample games → degraded → labels → official metric) | **done 2026-10-30**: reproduces the official full-match ranking of the 4 baselines; level optimistic (docs/EXTERNAL_VALIDATION.md) |
-| 3 | v1: ball gap fill + out-of-bounds/stationary dead ball + HSMM over nearest-player evidence | todo |
+| 3 | v1: ball gap fill + out-of-bounds/stationary dead ball + HSMM over nearest-player evidence | **done 12 Nov** (M1, `v1_rules`): ext spellF1 0.633 [0.609–0.664] vs baseline 0.336; in `submissions/433.csv` |
 | 4 | Dead-ball detector + restart logic (Laws of the Game: who restarts) | todo |
 | 5 | Control evidence: touch detection, team-shape features, GBM classifier | todo |
 | 6 | Sequence decoding: HSMM/Viterbi, boundary snapping, X policy | todo |
