@@ -20,6 +20,10 @@ Glossary of the arrays (units in brackets, NaN where a value does not exist):
     last_bx/by, next_bx/by   where the ball was last seen / is next seen          [m]
     last_out_m, next_out_m   ball_out_m at those two positions                    [m]
     static_len          length of the run of 'ball lying still' this frame is in  [frames]
+    kick_since          frames since the latest restart-like kick (NEVER if none) [frames]
+    kick_x, kick_y      where that kick happened                                  [m]
+    heading_out_m       ball missing: how far outside the pitch it would be HEADING_S after
+                        it vanished, at its last velocity (0 inside, NaN if seen)  [m]
     n_home, n_away      tracked objects per team
     speed_mean          mean speed of all tracked players                         [m/s]
     speed_mean_1s/_3s   the same, centred rolling mean over 1 s / 3 s             [m/s]
@@ -40,6 +44,15 @@ import numpy as np
 STATIC_MS = 0.5        # a ball slower than 0.5 m/s is lying still
 NEAR_M = (5.0, 10.0)   # radii for "players near the ball"
 KICKOFF_SPAN = 25      # frames either side of a kick-off used to see which half each team is in
+
+# A "restart-like kick" (M2): the ball lies still >= KICK_STILL frames and then moves faster
+# than KICK_MS within KICK_WINDOW frames, or it reappears after a gap of >= REAPPEAR_GAP frames
+# and moves faster than REAPPEAR_MS within KICK_WINDOW frames. Restarts look like this; so do
+# some moments of live play -- what such a kick MEANS is counted on the external labels.
+KICK_STILL, KICK_MS, KICK_WINDOW = 10, 4.0, 8
+REAPPEAR_GAP, REAPPEAR_MS = 50, 2.0
+NEVER = 10_000         # "frames since" value when the event never happened
+HEADING_S = 0.4        # where a vanishing ball would be after 0.4 s at its last velocity
 
 
 # --- small array helpers ---------------------------------------------------------------------
@@ -140,6 +153,31 @@ def ball_velocity(bx, by, fps):
     return vx, vy
 
 
+def restart_kicks(present, speed):
+    """Frames of restart-like kicks (see KICK_* above), sorted, each frame at most once."""
+    events = set()
+    with np.errstate(invalid="ignore"):
+        still = present & (speed < STATIC_MS)
+        for runs, min_len, min_speed in ((runs_of(still), KICK_STILL, KICK_MS),
+                                         (runs_of(~present), REAPPEAR_GAP, REAPPEAR_MS)):
+            for start, stop in runs:
+                if stop - start < min_len:
+                    continue
+                hit = np.flatnonzero(speed[stop:stop + KICK_WINDOW] >= min_speed)
+                if len(hit):
+                    events.add(stop + int(hit[0]))
+    return np.array(sorted(events), dtype=np.int64)
+
+
+def since_event(events, n):
+    """(frames since the latest event at or before each frame, index of that event or -1)."""
+    marks = np.zeros(n, dtype=bool)
+    marks[events] = True
+    last = last_index(marks)
+    since = np.where(last >= 0, np.arange(n) - last, NEVER)
+    return since.astype(np.int32), last
+
+
 def ball_features(track, info):
     """Everything about the ball; see the module glossary."""
     length, width = info["pitch"]
@@ -166,7 +204,17 @@ def ball_features(track, info):
         static = present & (speed < STATIC_MS)
     static_len, _, _ = run_position(static)
 
+    # M2: restart-like kicks, and where a vanishing ball was heading
+    kicks = restart_kicks(present, speed)
+    kick_since, kick_at = since_event(kicks, len(bx))
+    last_vx, last_vy = take_or_nan(vx, last), take_or_nan(vy, last)
+    heading_out = outside_distance(last_bx + last_vx * HEADING_S, last_by + last_vy * HEADING_S,
+                                   length, width)
+
     return {
+        "kick_since": kick_since,
+        "kick_x": take_or_nan(bx, kick_at), "kick_y": take_or_nan(by, kick_at),
+        "heading_out_m": np.where(present, np.nan, heading_out),
         "ball_present": present,
         "bx": bx, "by": by,
         "ball_vx": vx, "ball_vy": vy,

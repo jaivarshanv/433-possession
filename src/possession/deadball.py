@@ -58,6 +58,35 @@ def dead_cells(f, fps=config.FPS):
     return cells.astype(np.int32)
 
 
+# --- v2 (M2): add "how long since a restart-like kick" and "was the vanishing ball heading out"
+KICK_EDGES_S = (1.0, 3.0)           # s since a restart-like kick -> just kicked / recently / not
+N_KICK = len(KICK_EDGES_S) + 1
+V2_PRESENT_BASE = 1
+V2_MISSING_BASE = V2_PRESENT_BASE + 2 * N_STILL * N_KICK * N_SPEED
+N_CELLS_V2 = V2_MISSING_BASE + 2 * N_GAP * N_SPEED
+
+
+def dead_cells_v2(f, fps=config.FPS):
+    """v2 rule cells: v1 plus restart-like kicks (ends stoppages sharply: after a kick from rest
+    the ball is in play even though players are still slow) and the ball's heading when it
+    vanished (a ball last seen flying towards a line went out)."""
+    speed = speed_bin(f)
+    present = f["ball_present"]
+    out_now = np.nan_to_num(f["ball_out_m"]) > OUT_M
+    out_near = ((np.nan_to_num(f["last_out_m"]) > OUT_M) | (np.nan_to_num(f["next_out_m"]) > OUT_M)
+                | (np.nan_to_num(f["heading_out_m"]) > OUT_M))
+    still = np.digitize(f["static_len"] / fps, STILL_EDGES_S)
+    kick = np.digitize(f["kick_since"] / fps, KICK_EDGES_S)
+    gap = np.digitize(f["gap_len"] / fps, GAP_EDGES_S)
+
+    present_cell = V2_PRESENT_BASE + (((out_now.astype(int) * N_STILL + still) * N_KICK + kick)
+                                      * N_SPEED + speed)
+    missing_cell = V2_MISSING_BASE + (out_near.astype(int) * N_GAP + gap) * N_SPEED + speed
+    cells = np.where(present, present_cell, missing_cell)
+    cells[f["pre_kickoff"]] = 0
+    return cells.astype(np.int32)
+
+
 class CellTable:
     """P(hit | cell), counted on training frames and shrunk towards the overall rate.
 
@@ -78,7 +107,7 @@ class CellTable:
     def fit(self, cells, hits):
         n = np.bincount(cells, minlength=self.n_cells).astype(np.float64)
         h = np.bincount(cells, weights=hits.astype(np.float64), minlength=self.n_cells)
-        rate = h.sum() / max(n.sum(), 1.0)
+        rate = h.sum() / n.sum() if n.sum() > 0 else 0.5        # no data at all = no evidence
         self.p = np.clip((h + self.PRIOR_FRAMES * rate) / (n + self.PRIOR_FRAMES),
                          self.EPS, 1 - self.EPS)
         self.rate = float(np.clip(rate, self.EPS, 1 - self.EPS))

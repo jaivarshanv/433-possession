@@ -69,8 +69,23 @@ def target_inputs():
         "fps": config.FPS,
         "half": frames.half_of_frame(),
         "kickoff": dict(config.KICKOFF),
+        "tagging": tagged_set_pieces(),
     }
     return atd.load_cache("tactical"), info
+
+
+def tagged_set_pieces():
+    """Our match's Smart Tagging SET PIECES instances that name a team, as
+    [(start_frame, end_frame, team 0 home / 1 away)]. Soft evidence only (restarts.py);
+    throw-ins are tagged N/A and therefore not here. [] if the file is not available."""
+    from . import tagging
+    try:
+        tags = tagging.load_tagging()
+    except (OSError, IOError):
+        return []
+    rows = tags[(tags["code"] == "SET PIECES") & tags["team"].isin(["H", "A"])]
+    return [(int(r.start_frame), int(r.end_frame), 0 if r.team == "H" else 1)
+            for r in rows.itertuples()]
 
 
 def build_inputs(games=config.METRICA_GAMES, replicates=1, clean=False):
@@ -126,4 +141,6 @@ def evaluate(predict, inputs=None, bootstrap_n=0):
     if bootstrap_n:
         boot = scoring.score_codes(*pooled_arrays(first), bootstrap_n=bootstrap_n)
         interval = (boot["spell_bootstrap_low"], boot["spell_bootstrap_high"])
-    return {"per_game": per_game, "pooled": pooled, "interval": interval}
+    from . import diagnostics            # stoppage / restart numbers (external labels only)
+    return {"per_game": per_game, "pooled": pooled, "interval": interval,
+            "diagnostics": diagnostics.report(pairs)}

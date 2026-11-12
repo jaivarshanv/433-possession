@@ -11,9 +11,9 @@ Then every combination of the weight grid below is decoded on every game, and:
   * LEAVE-ONE-GAME-OUT: for each game, pick the best setting on the OTHER games, score it on
     this one. The pooled LOGO score is the honest estimate of "tune, then predict a new game".
 
-The script then names the simplest setting within NOISE of the best in-sample setting
-("simplest" = the one with the smallest weights, i.e. trusting the evidence least), which is
-the value to write into predictors.py. Nothing is written automatically.
+Decision rule printed at the end: KEEP the a-priori default setting unless some setting beats
+it in-sample by more than NOISE (then that setting, and it must also look good leave-one-game-
+out). Nothing is written automatically.
 """
 
 import argparse
@@ -31,6 +31,8 @@ NOISE = 0.02        # spellF1 differences below this are not meaningful (docs/EX
 # The grid per predictor: attribute name on the fitted model -> values to try.
 GRIDS = {
     "v1_rules": {"w_dead": [0.03, 0.05, 0.1, 0.2, 0.4], "w_team": [0.03, 0.05, 0.1, 0.2, 0.4]},
+    "v2_deadball": {"w_dead": [0.05, 0.1, 0.2], "w_team": [0.05, 0.1, 0.2],
+                    "w_restart": [0.5, 1.0, 2.0, 4.0]},
 }
 
 
@@ -51,6 +53,9 @@ def main():
     keys = sorted(grid)
     settings = [dict(zip(keys, values)) for values in itertools.product(*(grid[k] for k in keys))]
     inputs = harness.build_inputs(replicates=args.replicates)
+    default = {key: getattr(predictor.model_for(inputs[0][1]["game"]), key) for key in keys}
+    if default not in settings:
+        settings.append(default)
 
     # decode every (setting, input) once
     results = {}                                   # (setting index, game) -> list of (gt, pred)
@@ -81,11 +86,14 @@ def main():
         print("  {:<10} picked {}  -> held-out spellF1 {:.4f}".format(game, settings[pick], held))
     print("  pooled LOGO spellF1 {:.4f}".format(pooled_spell(logo_pairs)))
 
-    best = max(in_sample)
-    close = [i for i in range(len(settings)) if in_sample[i] >= best - NOISE]
-    simplest = min(close, key=lambda i: (sum(settings[i].values()), i))
-    print("\nbest in-sample {:.4f}; simplest within {} of it: {} ({:.4f})".format(
-        best, NOISE, settings[simplest], in_sample[simplest]))
+    best = int(np.argmax(in_sample))
+    keep = settings.index(default)
+    print("\ndefault {} scores {:.4f}; best {} scores {:.4f}".format(
+        default, in_sample[keep], settings[best], in_sample[best]))
+    if in_sample[best] - in_sample[keep] > NOISE:
+        print("-> CHANGE to the best setting (beats the default by more than {})".format(NOISE))
+    else:
+        print("-> KEEP the default (no setting beats it by more than {})".format(NOISE))
 
 
 if __name__ == "__main__":

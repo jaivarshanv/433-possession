@@ -63,6 +63,24 @@ def team_cells(f, fps=config.FPS):
     return cell.astype(np.int32), team
 
 
+# --- v2 (M2): the same cells, split by "a restart-like kick happened in the last RESTART_S"
+RESTART_S = 2.0
+N_TEAM_CELLS_V2 = 2 * N_DIRECT + N_CARRY + 1
+
+
+def team_cells_v2(f, fps=config.FPS):
+    """v2 possession cells: direct evidence right after a restart-like kick gets its own cells.
+
+    At a restart the player at the ball IS the restarter, which is far more reliable than the
+    nearest player in open play (measured on the external games: 97-100% vs ~80%).
+    """
+    cell, team = team_cells(f, fps)
+    restart = f["kick_since"] < RESTART_S * fps
+    v2 = np.where(cell < N_DIRECT, cell + N_DIRECT * restart.astype(int),   # direct cells x2
+                  cell + N_DIRECT)                                          # carry / none shift
+    return v2.astype(np.int32), team
+
+
 def home_given_alive(p_match, team):
     """P(home has the ball | alive) from P(evidence team has it) and which team that is."""
     return np.where(team == 0, p_match, np.where(team == 1, 1 - p_match, 0.5))
@@ -82,25 +100,35 @@ class RulesModel:
     """v1: rule cells (dead ball, possession) + HSMM, every probability counted on external labels.
 
     fit(train) takes [(features, info, gt)] of external games; predict(features, info) -> codes.
+    Later versions subclass it and replace the two cell functions (and their sizes).
     """
+
+    n_dead_cells = deadball.N_CELLS
+    n_team_cells = N_TEAM_CELLS
 
     def __init__(self, w_dead=W_DEAD, w_team=W_TEAM):
         self.w_dead, self.w_team = w_dead, w_team
+
+    def dead_cells(self, feats):
+        return deadball.dead_cells(feats)
+
+    def team_cells(self, feats):
+        return team_cells(feats)
 
     def fit(self, train):
         dead_c, dead_hit, team_c, team_hit = [], [], [], []
         for feats, _, gt in train:
             graded = gt != X
-            dead_c.append(deadball.dead_cells(feats)[graded])
+            dead_c.append(self.dead_cells(feats)[graded])
             dead_hit.append(gt[graded] == D)
-            cell, team = team_cells(feats)
+            cell, team = self.team_cells(feats)
             usable = ((gt == H) | (gt == A)) & (team >= 0)
             team_c.append(cell[usable])
             team_hit.append(gt[usable] == team[usable])     # H/A codes equal team codes 0/1
-        self.dead = deadball.CellTable(deadball.N_CELLS).fit(np.concatenate(dead_c),
-                                                             np.concatenate(dead_hit))
-        self.team = deadball.CellTable(N_TEAM_CELLS).fit(np.concatenate(team_c),
-                                                          np.concatenate(team_hit))
+        self.dead = deadball.CellTable(self.n_dead_cells).fit(np.concatenate(dead_c),
+                                                              np.concatenate(dead_hit))
+        self.team = deadball.CellTable(self.n_team_cells).fit(np.concatenate(team_c),
+                                                              np.concatenate(team_hit))
         labels = [gt for _, _, gt in train]
         self.durations = decoder.fit_durations(labels)
         self.log_trans = decoder.fit_transitions(labels)
@@ -108,8 +136,8 @@ class RulesModel:
 
     def probabilities(self, feats):
         """(P(dead), P(home | alive)) per frame."""
-        p_dead = self.dead.predict(deadball.dead_cells(feats))
-        cell, team = team_cells(feats)
+        p_dead = self.dead.predict(self.dead_cells(feats))
+        cell, team = self.team_cells(feats)
         return p_dead, home_given_alive(self.team.predict(cell), team)
 
     def scores(self, feats):

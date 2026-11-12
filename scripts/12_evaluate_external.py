@@ -68,6 +68,7 @@ def main():
             print("  " + line(game, result))
         pooled = out["pooled"]
         print("  " + line("POOLED", pooled))
+        print("  {:<14} {}".format("stoppages", out["diagnostics"]))
         interval = ""
         if out["interval"]:
             interval = " [{:.3f}-{:.3f}]".format(*out["interval"])
