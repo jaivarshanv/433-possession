@@ -1,0 +1,21 @@
+# --- match data and anything derived from it: NEVER commit (competition terms) ---
+data/
+cache/
+submissions/
+*.mp4
+*_atd.txt
+*_atd.xml
+*_homography.csv
+*_smart_tagging.xml
+
+# --- external datasets (download with scripts, don't redistribute) ---
+external/
+
+# --- python / tooling ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+*.egg-info/

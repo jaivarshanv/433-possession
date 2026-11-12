@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./data/**)",
+      "Read(./cache/**)",
+      "Read(./submissions/**)",
+      "Edit(./data/**)",
+      "Read(**/*.mp4)",
+      "Read(**/*_atd.txt)",
+      "Read(**/*_atd.xml)",
+      "Read(**/*_homography.csv)",
+      "Read(**/*_smart_tagging.xml)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_data.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
