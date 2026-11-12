@@ -4,7 +4,7 @@ A predictor follows the contract in harness.py: predict(track, info) -> (N,) lab
 The names are what scripts/12_evaluate_external.py and docs/EXPERIMENTS.md refer to.
 """
 
-from . import baselines, evidence, restarts, training
+from . import baselines, classifier, evidence, restarts, touches, training
 
 REGISTRY = {
     # The official reference baseline (official/starter/baseline.py), the four published windows.
@@ -20,12 +20,28 @@ REGISTRY = {
     "v2_deadball": training.LogoPredictor(lambda: restarts.DeadballModel()),
     # ablation: v2 without the Smart Tagging bonus (identical on the external games)
     "v2_deadball_notag": training.LogoPredictor(lambda: restarts.DeadballModel(use_tagging=False)),
+    # M3/M4: v2 + every H<->A hand-over snapped to the first new-team touch after the old
+    # team's last touch; and the X-policy ablation on top of it.
+    "v3_snap": training.LogoPredictor(lambda: touches.SnapModel()),
+    "v3_snap_x": training.LogoPredictor(lambda: touches.SnapModel(x_policy=True)),
+    # M3 (optional): v3 with gradient-boosted P(dead) and side-symmetric P(home | alive)
+    "v4_gbm": training.LogoPredictor(lambda: classifier.GbmModel()),
+    "v4_gbm_nosnap": training.LogoPredictor(lambda: classifier.GbmModel(snap=False)),
+    # hybrids (ablations): one of the two probabilities from the GBM, the other from v2 cells
+    "v4_gbmdead_rulesteam": training.LogoPredictor(
+        lambda: classifier.GbmModel(snap=False, gbm_team=False)),
+    "v4_rulesdead_gbmteam": training.LogoPredictor(
+        lambda: classifier.GbmModel(snap=False, gbm_dead=False)),
+    # v5: v4 (no snap) with team shape centred on each team's own half-median, so the
+    # possession model reads "unusually spread for this team", not "a wide team" (style)
+    "v5_gbm_centred": training.LogoPredictor(
+        lambda: classifier.GbmModel(snap=False, centre=True)),
 }
 
 
 # The predictor that produces submissions/433.csv (run.py). Changed only when a new version
 # beats it on the external harness by more than the noise (docs/EXPERIMENTS.md).
-CHOSEN = "v2_deadball"
+CHOSEN = "v5_gbm_centred"
 
 
 def get(name):

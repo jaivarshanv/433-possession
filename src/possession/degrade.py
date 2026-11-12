@@ -12,6 +12,8 @@ runs on it unchanged -- and degrades it on the way:
        the ball when it is SLOW, corrected data drops it on the line)
     3. in some stoppages the ball is seen at the restart spot before the restart
     4. bursty losses during live play, more likely on a slow ball and in a crowd
+    4b. a slowly varying offset, a 1 s moving average and jitter on the ball position (ours is
+       smoothed and not pinned to the player's feet)
     (the third ball field, height, stays NaN: the clean data has none)
   PLAYERS
     5. each player is lost in bursts, more often when someone is within CLOSE_M of him
@@ -52,6 +54,15 @@ LOSS_CROWD_MULT = 3.0       # x3 with CROWD_N or more players within CROWD_RADIU
 LOSS_MEDIAN, LOSS_SIGMA = 125, 1.0     # loss length in frames, lognormal (median 5 s)
 SLOW_BALL_MS = 5.0
 CROWD_RADIUS_M, CROWD_N = 3.0, 3
+# Ball kinematics (added 12 Nov, harness v2). Our tracker's ball is SMOOTHED (kick peaks ~4x
+# lower than corrected data: acceleration p99 37 vs ~140 m/s^2), jitters by ~1 cm, and sits
+# OFFSET from the player playing it (nearest player p50 1.9 m vs ~0.8 m in corrected data,
+# where the ball is pinned to the player's feet). Step 4b reproduces that: a slowly varying
+# random offset, then a 1 s moving average, then jitter -- calibrated on label-free aggregates
+# (acceleration percentiles, nearest-player distance, touches per minute).
+BALL_OFFSET_M, BALL_OFFSET_TAU_S = 1.0, 5.0   # per-axis std (m) and time constant (s)
+BALL_SMOOTH_FRAMES = 25                         # centred moving average over 1 s
+BALL_JITTER_M = 0.01
 
 # --- players -----------------------------------------------------------------------------
 SLOTS_PER_TEAM = (24, 22)   # our ATD: 24 home slots, 22 away slots
@@ -228,7 +239,25 @@ def degrade_ball(game, labels, rng):
     hazard = per_frame(LOSS_PER_LIVE_MIN) * live
     hazard = hazard * np.where(slow, LOSS_SLOW_MULT, 1.0) * np.where(crowd, LOSS_CROWD_MULT, 1.0)
     ball[bursts(rng, hazard, LOSS_MEDIAN, LOSS_SIGMA)] = np.nan
-    return ball
+    return blur_ball(ball, pitch, rng)                                         # 4b
+
+
+def blur_ball(ball, pitch, rng):
+    """Step 4b: slow random offset + 1 s moving average + jitter, on the frames it is seen."""
+    from scipy.signal import lfilter
+    from .features import rolling_nanmean
+
+    n = len(ball)
+    seen = ~np.isnan(ball[:, 0])
+    rho = np.exp(-1.0 / (BALL_OFFSET_TAU_S * config.FPS))      # AR(1) offset, std BALL_OFFSET_M
+    noise = rng.standard_normal((n, 2)) * BALL_OFFSET_M * np.sqrt(1 - rho ** 2)
+    offset = lfilter([1.0], [1.0, -rho], noise, axis=0) / np.array(pitch)
+    out = ball + offset
+    for k in (0, 1):
+        out[:, k] = rolling_nanmean(out[:, k], BALL_SMOOTH_FRAMES)
+    out += rng.normal(0.0, BALL_JITTER_M, size=(n, 2)) / np.array(pitch)
+    out[~seen] = np.nan
+    return out
 
 
 # --- players -------------------------------------------------------------------------------

@@ -82,13 +82,19 @@ def test_slots_are_not_people():
     assert (~np.isnan(out["px"])).sum(axis=1).mean() < 22
 
 
-def test_ball_is_lost_in_live_play_but_never_moved_there():
+def test_ball_is_lost_in_live_play_and_blurred_where_seen():
     game, labels = synthetic_clean_game()
     out = degrade.degrade(game, labels)
     live = labels != D
+    assert np.isnan(out["ball"][live, 0]).sum() > 0                 # bursty losses
+    # where both are seen, the degraded ball stays near the true one (offset ~1 m + smoothing)
     shown = live & ~np.isnan(out["ball"][:, 0]) & ~np.isnan(game["ball"][:, 0])
-    np.testing.assert_array_equal(out["ball"][shown, :2], game["ball"][shown])
-    assert np.isnan(out["ball"][live, 0]).sum() > 0
+    error = np.hypot((out["ball"][shown, 0] - game["ball"][shown, 0]) * 105.0,
+                     (out["ball"][shown, 1] - game["ball"][shown, 1]) * 68.0)
+    assert 0.0 < np.median(error) < 2.5
+    # no ball is invented in live play (the synthetic clean ball has no short holes to fill)
+    invented = live & ~np.isnan(out["ball"][:, 0]) & np.isnan(game["ball"][:, 0])
+    assert invented.sum() == 0
 
 
 def test_ball_rolls_on_after_leaving_play():

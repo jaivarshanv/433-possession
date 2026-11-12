@@ -150,6 +150,8 @@ src/possession/           our package
   training.py             leave-one-game-out fitting on external games (LogoPredictor)
   restarts.py             restart typing + Laws-of-the-Game restart team, v2 DeadballModel
   diagnostics.py          harness stoppage counts, boundary errors, restart-team accuracy
+  touches.py              touch detection, hand-over snapping, X policy (ablations), v3 model
+  classifier.py           gradient-boosted P(dead) and side-symmetric P(home|alive), v4/v5
 scripts/                  numbered pipeline steps; each prints aggregates only
 tests/                    pytest, synthetic data only (never match data)
 docs/                     PLAN.md, DECISIONS.md, EXPERIMENTS.md, EXTERNAL_VALIDATION.md
@@ -192,11 +194,11 @@ registered in `predictors.py`. It runs unchanged on our match via `harness.targe
 | # | stage | status |
 |---|---|---|
 | 1 | Data layer: parser, cache, frames, tagging, scoring wrapper | **done, verified 2026-10-30** |
-| 2 | External validation harness (Metrica sample games → degraded → labels → official metric) | **done 2026-10-30**: reproduces the official full-match ranking of the 4 baselines; level optimistic (docs/EXTERNAL_VALIDATION.md) |
+| 2 | External validation harness (Metrica sample games → degraded → labels → official metric) | **done 2026-10-30**; **harness v2 (12 Nov)** adds our tracker's ball smoothing/offset: baseline 0.270 vs 0.243 real (docs/EXTERNAL_VALIDATION.md §6) |
 | 3 | v1: ball gap fill + out-of-bounds/stationary dead ball + HSMM over nearest-player evidence | **done 12 Nov** (M1, `v1_rules`): ext spellF1 0.633 [0.609–0.664] vs baseline 0.336; in `submissions/433.csv` |
 | 4 | Dead-ball detector + restart logic (Laws of the Game: who restarts) | **done 12 Nov** (M2, `v2_deadball`): ext 0.645 [0.622–0.674], restart team 0.75 → 0.87; in `submissions/433.csv` |
-| 5 | Control evidence: touch detection, team-shape features, GBM classifier | todo |
-| 6 | Sequence decoding: HSMM/Viterbi, boundary snapping, X policy | todo |
+| 5 | Control evidence: touch detection, team-shape features, GBM classifier | **done 12 Nov** (M3, `v5_gbm_centred`, harness v2): ext 0.718 [0.694–0.751] vs v2 0.553; in `submissions/433.csv` |
+| 6 | Sequence decoding: HSMM/Viterbi, boundary snapping, X policy | **done 12 Nov** (M4): weights LOGO-tuned (defaults kept), snapping and X policy measured and dropped (D17, D18) |
 | 7 | Self-training on target match (algorithmic pseudo-labels) | todo |
 | 8 | Stretch: own ball detector (video), whistle audio, broadcast sync | todo |
 | 9 | Reproducibility (`make submission`), technical document | todo |

@@ -177,15 +177,16 @@ def refine_boundaries(segments, frame_scores, block=BLOCK):
     return [tuple(s) for s in segs]
 
 
-def decode(frame_scores, half, durations, log_trans, block=BLOCK):
+def decode(frame_scores, half, durations, log_trans, block=BLOCK, dur_weight=1.0):
     """Codes (N,) from per-frame state scores (N, 3). X outside graded halves.
 
     frame_scores[t, s] = evidence for state s at frame t (log scale, any offset per frame).
+    dur_weight scales the duration log-probabilities (1 = as fitted; tuned on the harness).
     Each half must be one contiguous run of frames.
     """
     n = len(frame_scores)
     codes = np.full(n, X, dtype=np.int8)
-    log_dur = duration_table(durations, block)
+    log_dur = dur_weight * duration_table(durations, block)
     for number in (1, 2):
         rows = np.flatnonzero(half == number)
         if not len(rows):

@@ -30,6 +30,9 @@ Glossary of the arrays (units in brackets, NaN where a value does not exist):
     decel_1s            speed_mean_1s now minus one second ago (negative = slowing down)
     speed_home/away_1s  team mean speed, rolled over 1 s                          [m/s]
     cx_home ... cy_away team centroids                                            [m]
+    sx_/sy_home/away    spread (std) of each team's x / y, rolled 1 s             [m]
+    len_/wid_home/away  each team's extent along x / y (max - min), rolled 1 s    [m]
+    vx_home/away        each team's centroid velocity along x over the last 1 s   [m/s]
     d_home, d_away      distance from the ball to the nearest player of each team [m]
     n_near5, n_near10   players (both teams) within 5 m / 10 m of the ball
     half                1 or 2 on graded frames, 0 elsewhere (copied from info)
@@ -259,6 +262,21 @@ def player_features(track, info, bx, by):
         out["cx_" + name] = nanmean_rows(np.nan_to_num(px[:, team]), seen[:, team])
         out["cy_" + name] = nanmean_rows(np.nan_to_num(py[:, team]), seen[:, team])
 
+    # Team shape (M3): spread, extent, and how the team moves, rolled over 1 s. These carry
+    # possession information when the ball is not seen: the team in possession spreads out
+    # and pushes up, the defending team compacts.
+    for name, team in (("home", home), ("away", away)):
+        x = np.where(seen[:, team], px[:, team], np.nan)
+        y = np.where(seen[:, team], py[:, team], np.nan)
+        out["sx_" + name] = rolling_nanmean(np.nanstd(x, axis=1), fps)
+        out["sy_" + name] = rolling_nanmean(np.nanstd(y, axis=1), fps)
+        out["len_" + name] = rolling_nanmean(np.nanmax(x, axis=1) - np.nanmin(x, axis=1), fps)
+        out["wid_" + name] = rolling_nanmean(np.nanmax(y, axis=1) - np.nanmin(y, axis=1), fps)
+        cx = out["cx_" + name]
+        vx = np.full(len(px), np.nan)
+        vx[fps:] = (cx[fps:] - cx[:-fps])                      # metres per second along x
+        out["vx_" + name] = vx
+
     # Distances to the ball: NaN where slot or ball is missing; nearest per team.
     with np.errstate(invalid="ignore"):
         dist = np.hypot(px - bx[:, None], py - by[:, None])
@@ -305,6 +323,8 @@ def compute(track, info):
             pre |= (half == number) & (frame < k)
         feats["half"] = half
         feats["pre_kickoff"] = pre
+        feats["pitch"] = tuple(info["pitch"])     # scalars that travel with the arrays
+        feats["fps"] = int(info["fps"])
         feats["home_dir"] = home_attack_direction(feats["cx_home"], feats["cx_away"], half,
                                                   info["kickoff"])
     return feats

@@ -105,6 +105,7 @@ class RulesModel:
 
     n_dead_cells = deadball.N_CELLS
     n_team_cells = N_TEAM_CELLS
+    w_dur = 1.0              # weight of the duration prior in the decoder (1 = as fitted)
 
     def __init__(self, w_dead=W_DEAD, w_team=W_TEAM):
         self.w_dead, self.w_team = w_dead, w_team
@@ -144,5 +145,10 @@ class RulesModel:
         p_dead, p_home = self.probabilities(feats)
         return state_scores(p_dead, self.dead.rate, p_home, self.w_dead, self.w_team)
 
+    def decode(self, scores, feats):
+        """The HSMM decoder with this model's durations, transitions and duration weight."""
+        return decoder.decode(scores, feats["half"], self.durations, self.log_trans,
+                              dur_weight=self.w_dur)
+
     def predict(self, feats, info):
-        return decoder.decode(self.scores(feats), feats["half"], self.durations, self.log_trans)
+        return self.decode(self.scores(feats), feats)

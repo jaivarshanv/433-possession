@@ -65,6 +65,20 @@ def ball_profile(track, mask, pitch):
         outside = (bx < 0) | (bx > 1) | (by < 0) | (by > 1)
     out["outside_pitch_share"] = round(float((outside & mask).sum() / mask.sum()), 4)
 
+    # Ball kinematics and how close the nearest player is (harness v2 calibration).
+    from . import features as feature_module, touches as touch_module
+    info = {"pitch": pitch, "fps": config.FPS, "half": mask.astype(np.int8), "kickoff": {}}
+    feats = feature_module.compute(track, info)
+    seen_in_mask = feats["ball_present"] & mask
+    accel = feats["ball_accel"][seen_in_mask]
+    near_player = np.fmin(feats["d_home"], feats["d_away"])[seen_in_mask]
+    out["accel_ms2_p50_90_99"] = pct(accel[np.isfinite(accel)], (50, 90, 99))
+    near_player = near_player[np.isfinite(near_player)]
+    out["nearest_player_m_p10_50"] = pct(near_player, (10, 50))
+    out["share_seen_with_player_within_1.5m"] = round(float(np.mean(near_player < 1.5)), 3)
+    touch_frames, _ = touch_module.detect(feats)
+    out["touches_per_min"] = round(float(np.sum(mask[touch_frames]) / minutes), 1)
+
     # Step size between consecutive visible frames: ball speed, and implausible jumps.
     step = np.hypot(np.diff(bx) * length, np.diff(by) * width)
     both = ~missing[1:] & ~missing[:-1] & mask[1:]

@@ -158,8 +158,7 @@ class DeadballModel(evidence.RulesModel):
         # own first-pass stoppages, exactly as the rules will be used on a new game.
         kinds, hits = [], []
         for feats, info, gt in train:
-            first_pass = decoder.decode(self.scores(feats), feats["half"], self.durations,
-                                        self.log_trans)
+            first_pass = self.decode(self.scores(feats), feats)
             for kind, team, frame in find_restarts(feats, first_pass, info):
                 check = frame + CHECK_FRAMES
                 if team >= 0 and check < len(gt) and gt[check] in (H, A):
@@ -173,7 +172,7 @@ class DeadballModel(evidence.RulesModel):
         scores = self.scores(feats)
         if self.use_tagging and info.get("tagging"):
             scores = scores + tagging_bonus(info["tagging"], len(scores))
-        first_pass = decoder.decode(scores, feats["half"], self.durations, self.log_trans)
+        first_pass = self.decode(scores, feats)
         found = find_restarts(feats, first_pass, info)
         scores = scores + restart_bonus(found, self.restart_table, len(scores), self.w_restart)
-        return decoder.decode(scores, feats["half"], self.durations, self.log_trans)
+        return self.decode(scores, feats)
