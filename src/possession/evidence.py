@@ -106,6 +106,7 @@ class RulesModel:
     n_dead_cells = deadball.N_CELLS
     n_team_cells = N_TEAM_CELLS
     w_dur = 1.0              # weight of the duration prior in the decoder (1 = as fitted)
+    switch_bonus = 0.0       # extra log-odds for an H<->A hand-over (v6; 0 = as fitted)
 
     def __init__(self, w_dead=W_DEAD, w_team=W_TEAM):
         self.w_dead, self.w_team = w_dead, w_team
@@ -146,8 +147,15 @@ class RulesModel:
         return state_scores(p_dead, self.dead.rate, p_home, self.w_dead, self.w_team)
 
     def decode(self, scores, feats):
-        """The HSMM decoder with this model's durations, transitions and duration weight."""
-        return decoder.decode(scores, feats["half"], self.durations, self.log_trans,
+        """The HSMM decoder with this model's durations, transitions and duration weight.
+
+        switch_bonus makes a hand-over between the teams cheaper (v6: the GBM versions merged
+        possessions on every external game -- merges 429 vs splits 289).
+        """
+        log_trans = self.log_trans.copy()
+        log_trans[H, A] += self.switch_bonus
+        log_trans[A, H] += self.switch_bonus
+        return decoder.decode(scores, feats["half"], self.durations, log_trans,
                               dur_weight=self.w_dur)
 
     def predict(self, feats, info):

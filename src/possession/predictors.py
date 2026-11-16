@@ -6,6 +6,16 @@ The names are what scripts/12_evaluate_external.py and docs/EXPERIMENTS.md refer
 
 from . import baselines, classifier, evidence, restarts, touches, training
 
+V6_SETTINGS = {"switch_bonus": 1.0, "w_dur": 1.0}     # best of the 13_tune.py grid (D24)
+
+
+def set_attrs(model, **values):
+    """Return `model` with some decoder attributes changed (used by v6)."""
+    for key, value in values.items():
+        setattr(model, key, value)
+    return model
+
+
 REGISTRY = {
     # The official reference baseline (official/starter/baseline.py), the four published windows.
     "baseline_raw": baselines.nearest_player_predictor(0),
@@ -36,6 +46,10 @@ REGISTRY = {
     # possession model reads "unusually spread for this team", not "a wide team" (style)
     "v5_gbm_centred": training.LogoPredictor(
         lambda: classifier.GbmModel(snap=False, centre=True)),
+    # v6 (16 Nov): v5 with a cheaper H<->A hand-over and/or duration weight against the
+    # measured under-segmentation; values chosen leave-one-game-out (13_tune.py, D24)
+    "v6_gbm_switch": training.LogoPredictor(
+        lambda: set_attrs(classifier.GbmModel(snap=False, centre=True), **V6_SETTINGS)),
 }
 
 
