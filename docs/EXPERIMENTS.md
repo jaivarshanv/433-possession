@@ -24,6 +24,25 @@ Everything learned is leave-one-game-out. Possessions are per replicate: predict
 | v3_snap_x | ablation: v3 + X inside long ball gaps of one possession | 0.6925* | 0.8885* | — | — | — | *harness v1: spellF1 identical by construction (X is forward-filled), macroF1 −0.013 → dropped (D18) |
 | **v5_gbm_centred** | **v4_gbm_nosnap with team shape centred on each team's own half-median (style-invariant)** | **0.7178 [0.694–0.751]** | **0.9133** | 0.5143 | 635 / 16.8 s | 206 / 17.4 s | **in `submissions/433.csv`** (D21-D22). Same as v4 within noise; removes a measured team-style bias (home share of live time 0.617 → 0.600). Weights default (13_tune: best +0.005), 1 training replicate (2: +0.009) |
 
+| v6_gbm_switch | v5 with a cheaper H↔A hand-over (+1 nat) against the measured under-segmentation (D24) | 0.7207 [0.700–0.752] | 0.9140 | 0.5143 | 661 / 16.1 s | 213 / 16.9 s | +0.003 over v5 = noise; LOGO 0.717 < default → **not adopted** |
+
+**Possession-count diagnostic (16 Nov, `scripts/14_possession_diagnostic.py`, replicate 0)**
+
+| predictor | ext poss pred / true (mean s) | ext D share pred / true | ext stoppages pred / true | merges / splits (±1 s) | per-game poss pred / true | ours: poss per graded min, D share |
+|---|---|---|---|---|---|---|
+| baseline_smooth50 | 1599 / 759 (7.6 / 13.7) | 0.294 / 0.397 | 292 / 311 | 785 / 1606 | 506/258, 513/233, 580/268 | 5.61, 0.323 |
+| v2_deadball | 694 / 759 (15.4 / 13.7) | 0.379 / 0.397 | 303 / 311 | 492 / 419 | 238/258, 220/233, 236/268 | 2.63, 0.415 |
+| v4_gbm_nosnap | 630 / 759 (16.9 / 13.7) | 0.382 / 0.397 | 303 / 311 | 427 / 290 | 195/258, 206/233, 229/268 | 1.90, 0.436 |
+| v5_gbm_centred | 627 / 759 (16.9 / 13.7) | 0.382 / 0.397 | 303 / 311 | 429 / 289 | 199/258, 201/233, 227/268 | 1.95, 0.435 |
+| v6_gbm_switch | 654 / 759 (16.2 / 13.7) | 0.382 / 0.397 | 302 / 311 | 421 / 307 | — | 2.01, 0.433 |
+
+Conclusion: the GBM versions under-segment on the external games too (every game, −17% pooled,
+merges > splits); stoppages are right, the missing possessions are hand-overs. A cheaper
+hand-over (v6 grid 0-6 nats, duration weight 0.5-1) does not convert that into spellF1: the
+best setting gains +0.0015 in-sample, leave-one-game-out is lower, ≥ 3 nats hurts. Our match
+shows a larger gap (206 vs 279 for v2, ratio 0.74 vs 0.90 externally) that the harness cannot
+explain or test.
+
 Tuning (13_tune.py, leave-one-game-out): v1 0.629, v2 0.629 (flat), v4_gbm_nosnap 0.7315 LOGO
 with all three folds picking (w_dead 0.2, w_team 0.2, w_dur 1.5) -- +0.005 over the defaults,
 within noise, so the defaults are kept.

@@ -85,6 +85,7 @@ Pooled over the 3 degraded games × 3 degradation seeds, leave-one-game-out, off
 | v3_snap | + hand-overs snapped to touches | 0.549 [0.518–0.571] | 0.854 | 232 |
 | v4_gbm_nosnap | gradient-boosted probabilities | 0.722 [0.700–0.754] | 0.914 | 212 |
 | **v5_gbm_centred (submitted)** | + style-invariant team shape | **0.718 [0.694–0.751]** | **0.913** | 212 |
+| v6_gbm_switch | + cheaper H↔A hand-over (+1 nat) | 0.721 [0.700–0.752] | 0.914 | 220 |
 
 Ablations: GBM for dead ball only 0.559; GBM for possession only 0.711 (the gain is in the
 possession model); snapping on top of the GBM −0.04; X policy ±0 spellF1, −0.013 macroF1;
@@ -93,22 +94,46 @@ the official full-match levels of the published baselines (smooth50 0.270 vs 0.2
 smooth25 within 0.004) and their macroF1 order. Public 5 minutes (check only): v5 spellF1 0.514,
 macroF1 0.726. On our match v5 predicts 206 possessions (mean 17.4 s) and 113 stoppages.
 
-## 7. Limitations
+## 7. Rules compliance
+
+- **Training and tuning data**: every fitted quantity (cell probabilities, duration priors,
+  transitions, the gradient-boosted models) and every chosen weight or threshold comes only from
+  Metrica Sports' sample games 1–3 (github.com/metrica-sports/sample-data, pinned commit
+  `e706dd506b360d69d9d123d5b8026e7294b13996`), credited to Metrica Sports. That repository has
+  **no licence file**; its README asks users to use the data responsibly and credit Metrica
+  Sports, which we do. Learned parts are scored leave-one-game-out.
+- **Simulator calibration**: the degradation of the sample games was calibrated only on
+  label-free aggregate statistics of the provided automatic tracking (missing-ball shares and gap
+  lengths, ball accelerations, nearest-player distances, object counts, tracklet lifetimes) — never
+  on the ground truth, never on the video.
+- **Team-shape centring** (v5) uses only the input tracking of the recording being predicted, at
+  prediction time: each team's shape minus its own median over the half. No labels.
+- **Public 5 minutes**: used only as a pipeline check (alignment, file format, label meaning).
+  Never used to choose a version, a weight or a threshold; where it disagreed with the harness,
+  the harness decided.
+- **Submitted**: `v5_gbm_centred`. It beats the best rule-only version by +0.17 external spellF1
+  and ties v4 within noise; it was preferred to v4 because it removes a measured, label-free team
+  style bias. v6 (+0.003, noise) was not adopted. No hand labels, corrections or frame-specific
+  constants anywhere; `python run.py` regenerates the file byte for byte.
+
+## 8. Limitations
 
 - Three external games only (≈ ±0.03 on spellF1); our derived labels approximate, but are not,
   the official ground-truth definition.
-- Domain shift: models are trained on simulated degradation. On our match the GBM versions
-  predict ~205 possessions (1.9 / min) against ~270–280 for the rule versions and 2.5–2.8 / min in
-  the external truth — possibly under-segmentation that the harness cannot see.
+- Under-segmentation: the GBM versions predict ~17% too few possessions on the external games
+  (merged hand-overs; stoppages are right), and on our match ~205 possessions (1.9 / min) against
+  ~280 for the rule-only version. A cheaper hand-over in the decoder did not convert this into
+  spellF1 (v6), so it was left as is.
 - Possessions under ~1 s are almost never predicted (the duration prior suppresses them).
 - With more time: more external games (PFF FC, SkillCorner) for training volume, ball height,
   and a learned sequence model instead of fixed log-normal durations.
 
-## 8. Reproduction
+## 9. Reproduction
 
 ```bash
 uv venv --python 3.11 && source .venv/bin/activate && uv pip install -r requirements.txt
-python run.py                # data/ -> submissions/433.csv (~15 s on a MacBook Pro M5, 16 GB)
+python run.py                # data/ -> submissions/433.csv (MacBook Pro M5, 16 GB: ~6 min on a
+                             # fresh clone incl. the sample-data download, ~15 s afterwards)
 python run.py --check-repro  # two rebuilds from empty caches: identical sha256
 pytest -q                    # synthetic tests
 ```

@@ -36,9 +36,12 @@ python run.py --check-repro   # rebuilds twice from empty caches and compares sh
 sha256-checked, ~180 MB, needs internet the first time) into `external/`, fits the model on
 those external games only, predicts every frame of our match and validates the file.
 
-Runtime on the machine we used (MacBook Pro M5, 16 GB, macOS): **~15 s** from empty caches,
-plus the one-off sample-data download. The output is byte-identical between runs (fixed seeds,
-pinned versions); `--check-repro` proves it.
+Runtime on the machine we used (MacBook Pro M5, 16 GB, macOS): **~6 minutes on a fresh clone**
+(measured: 333 s, almost all of it the one-off ~180 MB sample-data download), **~15 s** on later
+runs. The output is byte-identical between runs and machines with the pinned environment
+(fixed seeds, pinned versions): a fresh `git clone --recurse-submodules` with only `data/`
+linked in reproduced `submissions/433.csv` exactly (sha256 `de445d62…`); `--check-repro` checks
+the same locally.
 
 ## Tests and the external validation harness
 
